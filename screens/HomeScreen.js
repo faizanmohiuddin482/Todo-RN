@@ -1,146 +1,120 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
+import AsyncStorage from '@react-native-community/async-storage';
 import {
-  KeyboardAvoidingView,
+  Button,
+  StatusBar,
   StyleSheet,
   Text,
+  FlatList,
+  TouchableWithoutFeedback,
   View,
-  Platform,
-  TextInput,
-  TouchableOpacity,
   Keyboard,
-  ScrollView,
 } from 'react-native';
-import Task from '../screens/Task';
+import {createStackNavigator} from '@react-navigation/stack';
 import {AuthContext} from '../components/context';
-import AsyncStorage from '@react-native-community/async-storage';
+import SearchBar from '../components/SearchBar';
+import {useTasks} from '../components/TaskProvider';
+import COLORS from '../config/COLORS';
+import TaskInputModel from './TaskInputModel';
+import RoundButtonIcon from '../components/RoundButtonIcon';
+import Task from './Task';
 
-export default function HomeScreen() {
-  React.state = {
-    text: '',
-    name: '',
-    date: Date.now(),
+const Stack = createStackNavigator();
+
+export default function HomeScreen({navigation}) {
+  const [greetMessage, setGreetMessage] = useState('');
+  const [modalVisible, setModalVisible] = useState(false);
+  const {tasks, setTasks} = useTasks();
+  const findGreetMessage = () => {
+    const hrs = new Date().getHours();
+    if (hrs === 0 || hrs < 12) return setGreetMessage('Morning');
+    if (hrs === 1 || hrs < 17) return setGreetMessage('Afternoon');
+    setGreetMessage('Evening');
   };
+
   const {signOut} = React.useContext(AuthContext);
-  const [task, setTask] = useState();
-  const [taskItems, setTaskItems] = useState([]);
-  const [taskPersistValue, setTaskPersistValue] = useState([]);
-  const [added, setAdded] = useState(0);
 
-  const handleAddTask = async () => {
-    Keyboard.dismiss();
-    setTaskItems([...taskItems, task]);
-    setTask(null);
-    const tItems = JSON.stringify(taskItems);
-    try {
-      await AsyncStorage.setItem('name', tItems);
-      await AsyncStorage.setItem('date', Date().toString());
-      // await AsyncStorage.multiSet([
-      //   ['name', tItems],
-      //   ['date', Date().toString()],
-      // ]);
-      setAdded(added + 1);
-    } catch (err) {
-      console.log(err);
-    }
+  const handleOnSubmit = async (title, date, description) => {
+    const task = {id: Date.now(), title, date, description, time: Date.now()};
+    const updatedTasks = [...tasks, task];
+    setTasks(updatedTasks);
+    await AsyncStorage.setItem('tasks', JSON.stringify(updatedTasks));
   };
-  const getData = async () => {
-    try {
-      const value = await AsyncStorage.getItem('name');
-      if (value !== null) {
-        // We have data!!
-        console.log({value});
-        const tValue = JSON.parse(value);
-        setTaskPersistValue(tValue);
-      }
-    } catch (error) {
-      // Error retrieving data
-    }
-    try {
-      const value = await AsyncStorage.getItem('date');
-      if (value !== null) {
-        // We have data!!
-        console.log(value, 'date val');
-        // const tValue = JSON.parse(value);
-        // setTaskPersistValue(tValue);
-      }
-    } catch (error) {
-      // Error retrieving data
-    }
+  const openTask = task => {
+    navigation.navigate('Detail', {task});
   };
-  console.log(taskPersistValue, 'tpv');
-  React.useEffect(() => {
-    getData();
+  useEffect(() => {
+    findGreetMessage();
   }, []);
 
-  const completeTask = index => {
-    let itemsCopy = [...taskItems];
-    itemsCopy.splice(index, 1);
-    setTaskItems(itemsCopy);
-  };
-
   return (
-    <View style={styles.container}>
-      <View>
-        <View style={styles.writeTaskWrapper}>
-          <Text style={styles.sectionTitle}>Today's tasks</Text>
-        </View>
-        <View style={{alignItems: 'flex-end'}}>
-          <TouchableOpacity onPress={signOut}>
-            <View style={styles.addWrapper}>
-              <Text style={styles.addText}>Logout</Text>
+    <>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.LIGHT} />
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss()}>
+        <View style={styles.container}>
+          <Text style={styles.header}>{`Good ${greetMessage}`}</Text>
+          {!tasks ? <SearchBar containerStyle={{marginVertical: 15}} /> : null}
+          <FlatList
+            data={tasks}
+            numColumns={2}
+            keyExtractor={item => item.id.toString()}
+            columnWrapperStyle={{
+              justifyContent: 'space-between',
+              marginBottom: 10,
+            }}
+            renderItem={({item}) => (
+              <Task onPress={() => openTask(item)} item={item} />
+            )}
+          />
+          {!tasks ? (
+            <View
+              style={[
+                StyleSheet.absoluteFillObject,
+                styles.emptyHeaderContainer,
+              ]}>
+              <Text style={styles.emptyHeader}>Add Task</Text>
             </View>
-          </TouchableOpacity>
+          ) : null}
         </View>
+      </TouchableWithoutFeedback>
+      <RoundButtonIcon
+        onPress={() => setModalVisible(true)}
+        style={styles.addBtn}
+      />
+      <TaskInputModel
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onSubmit={handleOnSubmit}
+      />
+      <View style={{position: 'absolute', right: 255, bottom: 15}}>
+        <Button title="Logout" onPress={signOut} />
       </View>
-      {/* Added this scroll view to enable scrolling when list gets longer than the page */}
-      <ScrollView
-        contentContainerStyle={{
-          flexGrow: 1,
-        }}
-        keyboardShouldPersistTaps="handled">
-        {/* Today's Tasks */}
-        <View style={styles.tasksWrapper}>
-          <View style={styles.items}>
-            {/* This is where the tasks will go! */}
-            {taskPersistValue.map((item, index) => {
-              return (
-                <TouchableOpacity
-                  key={index}
-                  onPress={() => completeTask(index)}>
-                  <Task text={item} />
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-      </ScrollView>
-
-      {/* Write a task */}
-      {/* Uses a keyboard avoiding view which ensures the keyboard does not cover the items on screen */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.writeTaskWrapper}>
-        <TextInput
-          style={styles.input}
-          placeholder={'Write a task'}
-          value={task}
-          onChangeText={text => setTask(text)}
-        />
-        <TouchableOpacity onPress={() => handleAddTask()}>
-          <View style={styles.addWrapper}>
-            <Text style={styles.addText}>+</Text>
-          </View>
-        </TouchableOpacity>
-      </KeyboardAvoidingView>
-    </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    paddingHorizontal: 20,
     flex: 1,
-    backgroundColor: '#E8EAED',
   },
+  header: {
+    fontSize: 25,
+    fontWeight: 'bold',
+  },
+  emptyHeader: {
+    fontSize: 30,
+    textTransform: 'uppercase',
+    fontWeight: 'bold',
+    opacity: 0.2,
+  },
+  emptyHeaderContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    flex: 1,
+    zIndex: -1,
+  },
+  addBtn: {position: 'absolute', right: 20, bottom: 15},
   tasksWrapper: {
     paddingTop: 80,
     paddingHorizontal: 20,
