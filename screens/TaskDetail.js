@@ -1,10 +1,14 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {View, Text, Button, Alert, ScrollView, StyleSheet} from 'react-native';
 import AsyncStorage from '@react-native-community/async-storage';
+import TaskInputModel from './TaskInputModel';
 import {useTasks} from '../components/TaskProvider';
 const TaskDetail = props => {
-  const {task} = props.route.params;
+  // const {task} = props.route.params;
+  const [task, setTask] = useState(props.route.params.task);
   const {setTasks} = useTasks();
+  const [showModal, setShowModal] = useState(false);
+  const [isEdit, setIsEdit] = useState(false);
   const deleteTask = async () => {
     const result = await AsyncStorage.getItem('tasks');
     let tasks = [];
@@ -34,7 +38,32 @@ const TaskDetail = props => {
       },
     );
   };
+  const handleUpdate = async (title, description, date) => {
+    const result = await AsyncStorage.getItem('tasks');
+    let tasks = [];
+    if (result !== null) tasks = JSON.parse(result);
 
+    const newTasks = tasks.filter(t => {
+      if (t.id === task.id) {
+        t.title = title;
+        t.date = date;
+        t.description = description;
+        t.isUpdated = true;
+        setTask(t);
+      }
+      return t;
+    });
+    setTasks(newTasks);
+    await AsyncStorage.setItem('tasks', JSON.stringify(newTasks));
+  };
+
+  const handleOnClose = () => {
+    setShowModal(false);
+  };
+  const openEditModal = () => {
+    setIsEdit(true);
+    setShowModal(true);
+  };
   return (
     <>
       <ScrollView contentContainerStyle={[styles.container, {paddingTop: 10}]}>
@@ -50,9 +79,16 @@ const TaskDetail = props => {
           <Button
             title="edit"
             style={{backgroundColor: 'red'}}
-            onPress={() => console.log('edit')}
+            onPress={openEditModal}
           />
         </View>
+        <TaskInputModel
+          onClose={handleOnClose}
+          onSubmit={handleUpdate}
+          visible={showModal}
+          isEdit={isEdit}
+          task={task}
+        />
       </ScrollView>
     </>
   );

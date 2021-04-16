@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   StyleSheet,
   TextInput,
@@ -10,7 +10,7 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import COLORS from '../config/COLORS.js';
-const TaskInputModel = ({visible, onClose, onSubmit}) => {
+const TaskInputModel = ({visible, onClose, onSubmit, task, isEdit}) => {
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
   const [description, setDescription] = useState('');
@@ -19,6 +19,13 @@ const TaskInputModel = ({visible, onClose, onSubmit}) => {
     //   to close the keyboard when clicked outside
     Keyboard.dismiss();
   };
+  useEffect(() => {
+    if (isEdit) {
+      setTitle(task.title);
+      setDescription(task.description);
+      setDate(task.date);
+    }
+  }, [isEdit]);
 
   const handleOnChangeText = (text, valueFor) => {
     if (valueFor === 'title') setTitle(text);
@@ -29,18 +36,25 @@ const TaskInputModel = ({visible, onClose, onSubmit}) => {
     if (!title.trim() && !date.trim() && !description.trim()) {
       return onClose();
     }
-    onSubmit(title, date, description);
-    setTitle('');
-    setDate('');
-    setDescription('');
+    if (isEdit) {
+      onSubmit(title, date, description);
+    } else {
+      onSubmit(title, date, description);
+      setTitle('');
+      setDate('');
+      setDescription('');
+    }
+
     onClose();
   };
 
   const closeModal = () => {
-    setTitle('');
-    setDate('');
-    setDescription('');
-    onClose();
+    if (!isEdit) {
+      setTitle('');
+      setDate('');
+      setDescription('');
+      onClose();
+    }
   };
   return (
     <>
